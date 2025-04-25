@@ -2,9 +2,7 @@ import uuid, json
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, field
 
-class Jsonable:
-    __metaclass__ = ABCMeta
-
+class Jsonable(ABC):
     @classmethod
     @abstractmethod
     def to_json(cls):
@@ -402,8 +400,7 @@ class Marker(Jsonable):
             add_not_empty({}, "popup", self.popup.to_json()) if self.popup else {}
         )
 
-class Feature(Jsonable):
-    __metaclass__ = ABCMeta
+class Feature(ABC, Jsonable):
 
     def __init__(self, obj=None, f_type=""):
         self.feature_type = f_type
@@ -482,8 +479,7 @@ class Feature(Jsonable):
     def many(cls, num):
         return [Feature(None) for _ in range(num)]
 
-class MultiFeature(Feature):
-    __metaclass__ = ABCMeta
+class MultiFeature(ABC, Feature):
 
     def __init__(self, _type, obj=None):
         super().__init__(obj, _type)

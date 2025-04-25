@@ -1,11 +1,13 @@
 import uuid, json
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
+from typing import Iterator, Any
+
 
 class Jsonable(ABC):
     @classmethod
     @abstractmethod
-    def to_json(cls):
+    def to_json(cls) -> dict[str, Any]:
         """
         Converts the object to a JSON object
 
@@ -13,14 +15,14 @@ class Jsonable(ABC):
             object: The object as a JSON object
         """
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self.to_json())
 
 class GeoJSONException(Exception):
     """
     Represents a GeoJSON exception
     """
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         self.message = message
         super(Exception, self).__init__(message)
 
@@ -28,7 +30,7 @@ class FeatureException(GeoJSONException):
     """
     Represents a Feature exception
     """
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         self.message = message
         super(Exception, self).__init__(message)
 
@@ -44,184 +46,6 @@ class FeatureType:
     MULTI_POLYGON = "MultiPolygon"
     GEOMETRY_COLLECTION = "GeometryCollection"
 
-class GeoJSON(Jsonable):
-    """
-    Objective representation of a GeoJSON object
-
-    Follows the GeoJSON RFC 7946 specification (https://geojson.org/)
-
-    Added UI functionality implemented by the following documentation and references:
-     + LeafletJS(https://leafletjs.com/reference.html)
-     + Ignition (https://www.docs.inductiveautomation.com/docs/8.1/appendix/components/perspective-components/perspective-display-palette/perspective-map)
-    """
-    def __init__(self, obj=None):
-        self.type = "FeatureCollection"
-        self.features = []
-        self.aliases = {}
-
-        if obj is not None:
-            self.load_json_object(obj)
-
-    def __str__(self):
-        """
-        Returns a string representation of the object's GeoJSON.
-
-        Returns:
-            str: A string representation of the object's GeoJSON.
-        """
-        return json.dumps(self.to_json())
-
-    def __getitem__(self, key):
-        """
-        Indexes the GeoJSON object with a given ID
-
-        Args:
-            key (int): The index of the feature to get
-
-        Returns:
-            Feature: The feature at the specified index in [self.features]
-        """
-        return self.features[key]
-
-    def __iter__(self):
-        """
-        Provides an iterator over the features GeoJSON object
-
-        Returns:
-            Iterator: An iterator over the GeoJSON object
-        """
-        return self.features.__iter__()
-
-    def __len__(self):
-        """
-        Returns the number of features in the GeoJSON object
-
-        Returns:
-            int: The number of features in the GeoJSON object
-        """
-        return self.features.__len__()
-
-    def __contains__(self, item):
-        """
-        Returns whether the GeoJSON object contains a given feature
-
-        Args:
-            item: The Feature object to check for
-
-        Returns:
-            bool: Whether the GeoJSON object contains the given feature
-        """
-        if not isinstance(item, FeatureType):
-            raise TypeError("Expected a Feature object!")
-        return item in self.features
-
-    def add_feature(self, feature, alias=None):
-        self.features.append(feature)
-        if alias is not None:
-            self.aliases[alias] = feature.id
-
-    def remove_feature(self, feature):
-        """
-        Removes a feature from the GeoJSON object
-
-        Args:
-            feature (Feature): The feature to remove from the GeoJSON object
-        """
-        if not isinstance(feature, Feature):
-            raise TypeError("Expected a Feature object!")
-        self.features.remove(feature)
-        for alias, id in self.aliases.items():
-            if id == feature.id:
-                del self.aliases[alias]
-                break
-
-    def count(self, _type):
-        """
-        Counts the number of features in the GeoJSON object of type _type
-
-        Args:
-            _type (FeatureType): The type of feature to count
-
-        Returns:
-            int: The number of features in the GeoJSON object of type _type
-        """
-        if not isinstance(_type, FeatureType):
-            raise TypeError("Type must be of type FeatureType!")
-
-        return len([f for f in self.features if f.feature_type == _type])
-
-    def at_id(self, id):
-        """
-        Retrieves a feature by its id
-
-        Args:
-            _id (str): The id of the feature to retrieve
-
-        Returns:
-            Feature | None: The feature with the specified id, None if the id does not exist
-        """
-        res = [f for f in self.features if f.id == id][0]
-        return res if res else None
-
-    def at_alias(self, alias):
-        """
-        Retrieves a feature by the specified alias
-
-        Args:
-            alias: The alias of a feature to find
-
-        Returns:
-            Feature | None: The feature with the specified alias, None if the alias does not exist
-        """
-        id = self.aliases.get(alias, None)
-        if id is None:
-            raise GeoJSONException("No such alias '%s'" % alias)
-        res = [f for f in self.features if f.id == id][0]
-        return res if res else None
-
-    def first(self):
-        """
-        Retrieves the first feature in the GeoJSON object
-
-        Returns:
-            Feature | None: The first feature in the GeoJSON object, None if the GeoJSON object has no features
-        """
-        return self.features[0] if self.features else None
-
-    def last(self):
-        """
-        Retrieves the last feature in the GeoJSON object
-
-        Returns:
-            Feature | None: The last feature in the GeoJSON object, None if the GeoJSON object has no features
-        """
-        return self.features[-1] if self.features else None
-
-    def load_json_object(self, obj):
-        """
-        Loads data form a JSON object
-
-        Args:
-            obj: The JSON object to load
-        """
-        if "type" not in obj or obj["type"] != "FeatureCollection":
-            raise GeoJSONException("Missing or invalid required key \"type\"!")
-
-        for feature in obj["features"]:
-            self.features.append(convert_feature(feature))
-
-    def to_json(self):
-        """
-        Converts the GeoJSON object to a JSON object
-
-        Returns:
-            object: The GeoJSON object as a JSON object
-        """
-        return {
-            "type": self.type,
-            "features": [f.to_json() for f in self.features]
-        }
-
 @dataclass
 class Layer(Jsonable):
     """
@@ -230,7 +54,7 @@ class Layer(Jsonable):
     pane: str = None
     attribution: str = None
 
-    def to_json(self):
+    def to_json(self) -> dict[str, Any]:
         return add_not_empty(
             {},
             "options",
@@ -400,7 +224,7 @@ class Marker(Jsonable):
             add_not_empty({}, "popup", self.popup.to_json()) if self.popup else {}
         )
 
-class Feature(ABC, Jsonable):
+class Feature(Jsonable):
 
     def __init__(self, obj=None, f_type=""):
         self.feature_type = f_type
@@ -479,7 +303,7 @@ class Feature(ABC, Jsonable):
     def many(cls, num):
         return [Feature(None) for _ in range(num)]
 
-class MultiFeature(ABC, Feature):
+class MultiFeature(Feature):
 
     def __init__(self, _type, obj=None):
         super().__init__(obj, _type)
@@ -742,6 +566,187 @@ class GeometryCollection(MultiFeature):
             }
         }
 
+class GeoJSON(Jsonable):
+    """
+    Objective representation of a GeoJSON object
+
+    Follows the GeoJSON RFC 7946 specification (https://geojson.org/)
+
+    Added UI functionality implemented by the following documentation and references:
+     + LeafletJS(https://leafletjs.com/reference.html)
+     + Ignition (https://www.docs.inductiveautomation.com/docs/8.1/appendix/components/perspective-components/perspective-display-palette/perspective-map)
+    """
+    def __init__(self, obj: dict = None) -> None:
+        self.type = "FeatureCollection"
+        self.features = []
+        self.aliases = {}
+
+        if obj is not None:
+            self.load_json_object(obj)
+
+    def __str__(self) -> str:
+        """
+        Returns a string representation of the object's GeoJSON.
+
+        Returns:
+            str: A string representation of the object's GeoJSON.
+        """
+        return json.dumps(self.to_json())
+
+    def __getitem__(self, key) -> Feature | None:
+        """
+        Indexes the GeoJSON object with a given ID
+
+        Args:
+            key: The index of the feature to get
+
+        Returns:
+            Feature | None: The feature at the specified index in [self.features], None if it does not exist
+        """
+        try:
+            return self.features[key]
+        except IndexError:
+            return None
+
+    def __iter__(self) -> Iterator[Feature]:
+        """
+        Provides an iterator over the features GeoJSON object
+
+        Returns:
+            Iterator: An iterator over the GeoJSON object
+        """
+        return self.features.__iter__()
+
+    def __len__(self) -> int:
+        """
+        Returns the number of features in the GeoJSON object
+
+        Returns:
+            int: The number of features in the GeoJSON object
+        """
+        return self.features.__len__()
+
+    def __contains__(self, item: Feature) -> bool:
+        """
+        Returns whether the GeoJSON object contains a given feature
+
+        Args:
+            item: The Feature object to check for
+
+        Returns:
+            bool: Whether the GeoJSON object contains the given feature
+        """
+        if not isinstance(item, FeatureType):
+            raise TypeError("Expected a Feature object!")
+        return item in self.features
+
+    def add_feature(self, feature: Feature, alias: str = None) -> None:
+        self.features.append(feature)
+        if alias is not None:
+            self.aliases[alias] = feature.id
+
+    def remove_feature(self, feature: Feature) -> None:
+        """
+        Removes a feature from the GeoJSON object
+
+        Args:
+            feature: The feature to remove from the GeoJSON object
+        """
+        if not isinstance(feature, Feature):
+            raise TypeError("Expected a Feature object!")
+        self.features.remove(feature)
+        for alias, id in self.aliases.items():
+            if id == feature.id:
+                del self.aliases[alias]
+                break
+
+    def count(self, _type: FeatureType) -> int:
+        """
+        Counts the number of features in the GeoJSON object of type _type
+
+        Args:
+            _type: The type of feature to count
+
+        Returns:
+            int: The number of features in the GeoJSON object of type _type
+        """
+        if not isinstance(_type, FeatureType):
+            raise TypeError("Type must be of type FeatureType!")
+
+        return len([f for f in self.features if f.feature_type == _type])
+
+    def at_id(self, _id: str) -> Feature | None:
+        """
+        Retrieves a feature by its id
+
+        Args:
+            _id: The id of the feature to retrieve
+
+        Returns:
+            Feature | None: The feature with the specified id, None if the id does not exist
+        """
+        res = [f for f in self.features if f.id == id][0]
+        return res if res else None
+
+    def at_alias(self, alias: str) -> Feature | None:
+        """
+        Retrieves a feature by the specified alias
+
+        Args:
+            alias: The alias of a feature to find
+
+        Returns:
+            Feature | None: The feature with the specified alias, None if the alias does not exist
+        """
+        _id = self.aliases.get(alias, None)
+        if _id is None:
+            raise GeoJSONException("No such alias '%s'" % alias)
+        res = [f for f in self.features if f.id == _id][0]
+        return res if res else None
+
+    def first(self) -> Feature | None:
+        """
+        Retrieves the first feature in the GeoJSON object
+
+        Returns:
+            Feature | None: The first feature in the GeoJSON object, None if the GeoJSON object has no features
+        """
+        return self.features[0] if self.features else None
+
+    def last(self) -> Feature | None:
+        """
+        Retrieves the last feature in the GeoJSON object
+
+        Returns:
+            Feature | None: The last feature in the GeoJSON object, None if the GeoJSON object has no features
+        """
+        return self.features[-1] if self.features else None
+
+    def load_json_object(self, obj: dict) -> None:
+        """
+        Loads data form a JSON object
+
+        Args:
+            obj: The JSON object to load
+        """
+        if "type" not in obj or obj["type"] != "FeatureCollection":
+            raise GeoJSONException("Missing or invalid required key \"type\"!")
+
+        for feature in obj["features"]:
+            self.features.append(convert_feature(feature))
+
+    def to_json(self) -> dict[str, Any]:
+        """
+        Converts the GeoJSON object to a JSON object
+
+        Returns:
+            object: The GeoJSON object as a JSON object
+        """
+        return {
+            "type": self.type,
+            "features": [f.to_json() for f in self.features]
+        }
+
 def convert_feature(feature):
     """
     Instantiates a feature from a JSON object
@@ -772,7 +777,7 @@ def convert_feature(feature):
         return GeometryCollection(feature)
     return Feature(None)
 
-def soft_update(obj_a, obj_b):
+def soft_update(obj_a: dict[str, Any], obj_b: dict[str, Any]):
     """
     Combines all objects shared between two objects, keeping any conflicting non-object values from obj_b
 
@@ -798,21 +803,24 @@ def soft_update(obj_a, obj_b):
 
     return obj
 
-def soft_updates(*args):
+def soft_updates(*args: *tuple[dict[str, Any]]):
     obj = {}
     for curr in args:
         obj = soft_update(obj, curr)
     return obj
 
-def compact_options(**kwargs):
+def compact_options(**kwargs: dict[str, Any]):
     return { key: _clean(value) for key, value in kwargs.items() if value is not None }
 
-def _clean(value):
+def _clean(value: str | int | float | bool | None | list | dict):
     if isinstance(value, dict):
         return { k: _clean(v) for k, v in value.items() if v is not None }
     return value
 
-def add_not_empty(base, key, value):
+def add_not_empty(base: dict, key: str, value: str | int | float | bool | None | list | dict):
+    """
+    TODO
+    """
     if value:
         base[key] = value
     return base
